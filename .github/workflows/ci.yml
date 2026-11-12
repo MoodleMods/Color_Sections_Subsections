@@ -1,0 +1,96 @@
+name: Validate and build Section Colors
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        moodle: [MOODLE_405_STABLE, MOODLE_502_STABLE]
+        database: [pgsql, mariadb]
+    services:
+      postgres:
+        image: ${{ matrix.database == 'pgsql' && 'postgres:17' || '' }}
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432:5432
+        options: --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
+      mariadb:
+        image: ${{ matrix.database == 'mariadb' && 'mariadb:11' || '' }}
+        env:
+          MARIADB_ALLOW_EMPTY_ROOT_PASSWORD: '1'
+        ports:
+          - 3306:3306
+        options: --health-cmd="healthcheck.sh --connect --innodb_initialized" --health-interval 10s --health-timeout 5s --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: plugin
+          persist-credentials: false
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: mysqli, pgsql, intl, soap, zip, gd, mbstring, curl, xml
+          ini-values: max_input_vars=5000
+          coverage: none
+      - name: Set up Moodle plugin CI
+        run: |
+          composer create-project -n --no-dev --prefer-dist moodlehq/moodle-plugin-ci ci ^4
+          echo "$GITHUB_WORKSPACE/ci/bin" >> "$GITHUB_PATH"
+          echo "$GITHUB_WORKSPACE/ci/vendor/bin" >> "$GITHUB_PATH"
+          sudo locale-gen en_AU.UTF-8
+          echo "NVM_DIR=$HOME/.nvm" >> "$GITHUB_ENV"
+      - name: Install Moodle and the plugin
+        run: moodle-plugin-ci install --plugin ./plugin --db-host=127.0.0.1
+        env:
+          DB: ${{ matrix.database }}
+          MOODLE_BRANCH: ${{ matrix.moodle }}
+      - name: Picker behavior regression checks
+        run: node plugin/tools/check-picker-mock.cjs
+      - name: PHP syntax
+        run: moodle-plugin-ci phplint
+      - name: Moodle coding standards
+        run: moodle-plugin-ci phpcs --max-warnings 0
+      - name: PHP documentation
+        run: moodle-plugin-ci phpdoc --max-warnings 0
+      - name: Build and lint JavaScript and CSS with Moodle Grunt
+        run: moodle-plugin-ci grunt --max-lint-warnings 0
+      - name: Validate plugin metadata
+        run: moodle-plugin-ci validate
+      - name: Upgrade savepoints
+        run: moodle-plugin-ci savepoints
+      - name: PHPUnit
+        run: moodle-plugin-ci phpunit --fail-on-warning
+      - name: Behat browser scenarios
+        run: moodle-plugin-ci behat --profile chrome
+      - name: Package built plugin
+        run: python3 plugin/tools/package.py plugin "$RUNNER_TEMP/local_sectioncolors-1.0.16.zip" --require-build
+      - name: Retain checked candidate
+        uses: actions/upload-artifact@v4
+        with:
+          name: candidate-${{ matrix.moodle }}-${{ matrix.database }}
+          path: ${{ runner.temp }}/local_sectioncolors-1.0.16.zip
+          if-no-files-found: error
+  submission:
+    needs: checks
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: candidate-MOODLE_502_STABLE-pgsql
+          path: release
+      - uses: actions/upload-artifact@v4
+        with:
+          name: submission-zip
+          path: release/local_sectioncolors-1.0.16.zip
+          if-no-files-found: error
