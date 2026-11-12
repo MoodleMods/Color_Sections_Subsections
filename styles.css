@@ -1,0 +1,53 @@
+/* Section colors. Copyright 2026 Rino Vincenti. GNU GPL v3 or later. */
+.local-sectioncolors-picker {
+    max-width: 9.5rem;
+    width: 100%;
+}
+.local-sectioncolors-summary {
+    cursor: pointer;
+    padding: .25rem .4rem;
+    font-size: .8125rem;
+    border: 1px solid #767676;
+    border-radius: 4px;
+    overflow-wrap: anywhere;
+}
+.local-sectioncolors-swatch {
+    display: inline-block;
+    width: 1em;
+    height: 1em;
+    border: 1px solid #666;
+    border-radius: 3px;
+    flex-shrink: 0;
+    vertical-align: middle;
+    margin-inline-end: .5em;
+}
+.local-sectioncolors-choices {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: .25rem;
+    max-height: 65vh;
+    overflow-y: auto;
+    border: 1px solid #767676;
+}
+.local-sectioncolors-picker .local-sectioncolors-choice {
+    display: flex;
+    align-items: center;
+    text-align: start;
+    width: 100%;
+    font-size: .8125rem;
+    line-height: 1.2;
+    padding: 2px 6px;
+    min-height: 24px;
+    flex-shrink: 0;
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+.local-sectioncolors-picker .local-sectioncolors-selected {
+    font-weight: bold;
+}
+.local-sectioncolors-summary:focus-visible,
+.local-sectioncolors-choice:focus-visible {
+    outline: 2px solid currentColor;
+    outline-offset: 2px;
+}
